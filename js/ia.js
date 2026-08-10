@@ -1,4 +1,4 @@
-const whatsappLoja = "5513991615439";
+const whatsappLoja = "5513999999999";
 
 function gerarMensagemWhatsApp() {
 
@@ -260,6 +260,7 @@ function calcularTotalPedido() {
 const listaSabores = produtos
   .map(produto => `${produto.emoji} ${produto.nome}`)
   .join("\n");
+
 
 
 // ==================================================
