@@ -1,36 +1,77 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
 
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Teste Puter AI</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-  <link rel="stylesheet" href="style.css">
+    <title>Trufas Premium</title>
 
-  <script src="https://js.puter.com/v2/"></script>
-</head>
+    <link rel="stylesheet" href="./css/style.css" />
 
-<body>
+    <!-- Puter AI -->
+    <script src="https://js.puter.com/v2/"></script>
+  </head>
 
-  <main class="container">
+  <body>
+    <main class="chat">
+      <header class="chat-header">
+        <div class="logo">🍫</div>
 
-    <h1>Teste Puter AI 🤖</h1>
+        <div>
+          <h1>Trufas Premium</h1>
+          <span>Assistente virtual</span>
+        </div>
+      </header>
 
-    <input type="text" id="pergunta" placeholder="Digite uma pergunta...">
+      <section id="chat" class="chat-messages">
+        <!-- As mensagens serão inseridas pelo JavaScript -->
+      </section>
 
-    <button id="btnPerguntar">
-      Perguntar
-    </button>
+      <form id="form-chat" class="chat-input">
+        <input
+          id="mensagem"
+          type="text"
+          placeholder="Digite sua mensagem..."
+          autocomplete="off"
+        />
 
-    <div id="resposta">
-      A resposta aparecerá aqui...
-    </div>
+        <button type="submit">Enviar</button>
+      </form>
 
-  </main>
+      <!-- CARRINHO -->
+      <div class="carrinho">
+        <button id="btn-carrinho" class="btn-carrinho">
+          🛒
+          <span id="contador-carrinho">0</span>
+        </button>
 
-  <script src="script.js"></script>
+        <div id="painel-carrinho" class="painel-carrinho">
+          <div class="carrinho-header">
+            <h2>Seu pedido</h2>
 
-</body>
+            <button id="fechar-carrinho">✕</button>
+          </div>
 
+          <div id="lista-carrinho" class="lista-carrinho">
+            <!-- Produtos serão inseridos pelo JavaScript -->
+          </div>
+
+          <div class="carrinho-footer">
+            <div class="carrinho-total">
+              <span>Total</span>
+              <strong id="total-carrinho"> R$ 0,00 </strong>
+            </div>
+
+            <button id="finalizar-pedido" class="btn-finalizar">
+              Finalizar pedido
+            </button>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <script src="./js/produtos.js"></script>
+    <script src="./js/ia.js"></script>
+  </body>
 </html>
