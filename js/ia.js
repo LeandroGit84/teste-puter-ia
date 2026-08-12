@@ -1,59 +1,127 @@
-const whatsappLoja = "5513999999999";
+const whatsappLoja = "5513991615439";
+
+// ==================================================
+// FORMATAÇÃO
+// ==================================================
+
+function formatarDinheiro(valor) {
+
+  return valor
+    .toFixed(2)
+    .replace(".", ",");
+}
+
+
+function formatarCEP(cep) {
+
+  const numero = cep.replace(/\D/g, "");
+
+  if (numero.length !== 8) {
+    return cep;
+  }
+
+  return `${numero.substring(0, 5)}-${numero.substring(5)}`;
+}
 
 function gerarMensagemWhatsApp() {
 
-    let mensagem = `🍫 *NOVO PEDIDO - TRUFAS PREMIUM*\n\n`;
+  let mensagem =
+    `🍫 *NOVO PEDIDO - TRUFAS PREMIUM*\n\n`;
 
-    mensagem += `📋 *Pedido:* #${pedido.numero}\n\n`;
+  mensagem +=
+    `📋 *Pedido:* #${pedido.numero}\n\n`;
 
-    mensagem += `👤 *Cliente:* ${pedido.cliente.nome}\n`;
+  mensagem +=
+    `👤 *Cliente:* ${pedido.cliente.nome}\n`;
 
-    mensagem += `📍 *Endereço:* ${pedido.cliente.endereco}\n`;
+  mensagem +=
+    `📍 *CEP:* ${formatarCEP(pedido.cliente.cep)}\n`;
 
-    mensagem += `🚚 *Tipo:* ${pedido.entrega.tipo}\n`;
+  mensagem +=
+    `🏘️ *Bairro:* ${pedido.cliente.bairro}\n`;
 
-    mensagem += `💳 *Pagamento:* ${pedido.pagamento}\n\n`;
+  mensagem +=
+    `🏠 *Endereço:* ${pedido.cliente.endereco}\n`;
 
-    mensagem += `🛒 *ITENS DO PEDIDO:*\n`;
+    if (pedido.cliente.complemento) {
 
-    pedido.itens.forEach(item => {
+  mensagem +=
+    `🏢 *Complemento:* ${pedido.cliente.complemento}\n`;
 
-        mensagem +=
-            `${item.emoji} ${item.quantidade}x ${item.produto} - R$ ${item.subtotal
-                .toFixed(2)
-                .replace(".", ",")}\n`;
+}
 
-    });
+  mensagem +=
+    `🚚 *Tipo:* ${pedido.entrega.tipo}\n`;
 
-    // ----------------------------------------------
-    // VALORES
-    // ----------------------------------------------
+  mensagem +=
+    `💳 *Pagamento:* ${pedido.pagamento}\n\n`;
 
-    const totalProdutos =
-        pedido.total - pedido.entrega.taxa;
+  if (pedido.pagamento === "Dinheiro") {
 
-    mensagem += `\n💰 *Produtos:* R$ ${totalProdutos
-        .toFixed(2)
-        .replace(".", ",")}`;
+    if (pedido.trocoPara) {
 
-    if (pedido.entrega.tipo === "Entrega") {
+      const valorTroco =
+        pedido.trocoPara - pedido.total;
 
-        mensagem +=
-            `\n🚚 *Taxa de entrega:* R$ ${pedido.entrega.taxa
-                .toFixed(2)
-                .replace(".", ",")}`;
+      mensagem +=
+        `💵 *Troco para:* R$ ${formatarDinheiro(pedido.trocoPara)}\n`;
+
+      mensagem +=
+        `💰 *Troco:* R$ ${formatarDinheiro(valorTroco)}\n`;
 
     } else {
 
-        mensagem += `\n🏪 *Retirada:* Grátis`;
+      mensagem +=
+        `💵 *Troco:* Não precisa\n`;
 
     }
+  }
 
-    mensagem += `\n\n💵 *TOTAL:* R$ ${pedido.total
-        .toFixed(2)
-        .replace(".", ",")}`;
 
-    return mensagem;
+  mensagem +=
+    `🛒 *ITENS DO PEDIDO:*\n`;
+
+  pedido.itens.forEach(item => {
+
+    mensagem +=
+      `${item.emoji} ${item.quantidade}x ${item.produto} - R$ ${formatarDinheiro(item.subtotal)}\n`;
+
+  });
+
+
+  // ----------------------------------------------
+  // VALORES
+  // ----------------------------------------------
+
+  const totalProdutos =
+    pedido.itens.reduce(
+      (total, item) => total + item.subtotal,
+      0
+    );
+
+
+  mensagem +=
+    `\n💰 *Produtos:* R$ ${formatarDinheiro(totalProdutos)}`;
+
+
+  if (pedido.entrega.tipo === "Entrega") {
+
+    mensagem +=
+      `\n🚚 *Taxa de entrega:* R$ ${formatarDinheiro(pedido.entrega.taxa)}`;
+
+  } else {
+
+    mensagem +=
+      `\n🏪 *Retirada:* Grátis`;
+
+  }
+
+
+  mensagem +=
+    `\n\n💵 *TOTAL:* R$ ${formatarDinheiro(pedido.total)}`;
+
+
+  return mensagem;
 }
 
 function enviarPedidoWhatsApp() {
@@ -65,9 +133,6 @@ function enviarPedidoWhatsApp() {
 
   window.open(url, "_blank");
 }
-
-
-
 
 
 // ==================================================
@@ -88,7 +153,10 @@ let historico = [];
 let pedido = {
   cliente: {
     nome: "",
-    endereco: ""
+    cep: "",
+    bairro: "",
+    endereco: "",
+    complemento: "",
   },
 
   entrega: {
@@ -97,6 +165,7 @@ let pedido = {
   },
 
   pagamento: "",
+  trocoPara: null,
 
   itens: [],
   total: 0
@@ -334,6 +403,76 @@ ${conversa}
 
 
 // ==================================================
+// IDENTIFICAR FORMA DE PAGAMENTO
+// ==================================================
+
+function identificarTroco(mensagem) {
+
+  const resposta = normalizarTexto(mensagem);
+
+  if (
+    resposta.includes("nao") ||
+    resposta.includes("nao preciso") ||
+    resposta.includes("sem troco")
+  ) {
+    return {
+      precisaTroco: false,
+      valor: null
+    };
+  }
+
+  const valorEncontrado = mensagem.match(
+    /(?:r\$?\s*)?(\d+(?:[.,]\d{1,2})?)/i
+  );
+
+  if (valorEncontrado) {
+
+    const valor = parseFloat(
+      valorEncontrado[1]
+        .replace(",", ".")
+    );
+
+    if (valor > 0) {
+
+      return {
+        precisaTroco: true,
+        valor: valor
+      };
+
+    }
+  }
+
+  return null;
+}
+
+function identificarPagamento(mensagem) {
+
+  const resposta = normalizarTexto(mensagem);
+
+  if (
+    resposta.includes("pix")
+  ) {
+    return "Pix";
+  }
+
+  if (
+    resposta.includes("dinheiro")
+  ) {
+    return "Dinheiro";
+  }
+
+  if (
+    resposta.includes("cartao") ||
+    resposta.includes("credito") ||
+    resposta.includes("debito")
+  ) {
+    return "Cartão";
+  }
+
+  return null;
+}
+
+// ==================================================
 // ENVIO DA MENSAGEM
 // ==================================================
 
@@ -360,11 +499,11 @@ form.addEventListener("submit", async (event) => {
     );
 
     adicionarMensagem(
-      "Agora, qual é o endereço para entrega?",
+      "Agora, informe seu CEP para calcularmos a taxa de entrega. 📍",
       "ia"
     );
 
-    etapa = "informar-endereco";
+    etapa = "informar-cep";
 
     input.value = "";
     input.disabled = false;
@@ -376,15 +515,197 @@ form.addEventListener("submit", async (event) => {
   }
 
   // ----------------------------------------------
-  // SEGUNDA ETAPA DA FINALIZAÇÃO: ENDEREÇO
+  // SEGUNDA ETAPA DA FINALIZAÇÃO: CEP
+  // ----------------------------------------------
+
+  if (etapa === "informar-cep") {
+
+    const cep = mensagem.replace(/\D/g, "");
+
+    if (cep.length !== 8) {
+
+      adicionarMensagem(
+        "Por favor, informe um CEP válido com 8 números. 📍",
+        "ia"
+      );
+
+      input.value = "";
+      input.disabled = false;
+      input.focus();
+
+      return;
+    }
+
+    pedido.cliente.cep = cep;
+
+    adicionarMensagem(
+      `CEP ${cep} registrado! 👍`,
+      "ia"
+    );
+
+    adicionarMensagem(
+      "Agora, qual é o seu bairro?",
+      "ia"
+    );
+
+    etapa = "informar-bairro";
+
+    input.value = "";
+    input.disabled = false;
+    input.focus();
+
+    console.log("CEP:", pedido.cliente.cep);
+
+    return;
+  }
+
+  // ----------------------------------------------
+  // TERCEIRA ETAPA DA FINALIZAÇÃO: BAIRRO
+  // ----------------------------------------------
+
+  if (etapa === "informar-bairro") {
+
+    const bairro = mensagem.trim();
+
+    if (!bairro) {
+
+      adicionarMensagem(
+        "Por favor, informe o nome do bairro. 📍",
+        "ia"
+      );
+
+      input.value = "";
+      input.disabled = false;
+      input.focus();
+
+      return;
+    }
+
+    pedido.cliente.bairro = bairro;
+
+    const registroTaxa = buscarTaxaPorBairro(bairro);
+
+    if (!registroTaxa) {
+
+      adicionarMensagem(
+        `Não encontrei o bairro "${bairro}" na nossa tabela de entrega.`,
+        "ia"
+      );
+
+      adicionarMensagem(
+        "Por favor, confira o nome do bairro e informe novamente.",
+        "ia"
+      );
+
+      input.value = "";
+      input.disabled = false;
+      input.focus();
+
+      return;
+    }
+
+    pedido.entrega.taxa = registroTaxa.taxa;
+
+    adicionarMensagem(
+      `Bairro ${registroTaxa.bairro} identificado! 📍`,
+      "ia"
+    );
+
+    adicionarMensagem(
+      `Taxa de entrega cadastrada: R$ ${registroTaxa.taxa
+        .toFixed(2)
+        .replace(".", ",")} 🚚`,
+      "ia"
+    );
+
+    adicionarMensagem(
+      "Agora, qual é o endereço para entrega?",
+      "ia"
+    );
+
+    etapa = "informar-endereco";
+
+    input.value = "";
+    input.disabled = false;
+    input.focus();
+
+    console.log("Bairro:", pedido.cliente.bairro);
+    console.log("Taxa encontrada:", pedido.entrega.taxa);
+
+    return;
+  }
+
+  // ----------------------------------------------
+  // QUARTA ETAPA DA FINALIZAÇÃO: ENDEREÇO
   // ----------------------------------------------
 
   if (etapa === "informar-endereco") {
 
-    pedido.cliente.endereco = mensagem;
+    const endereco = mensagem.trim();
+
+    if (endereco.length < 3) {
+
+      adicionarMensagem(
+        "Por favor, informe um endereço válido. 🏠",
+        "ia"
+      );
+
+      input.value = "";
+      input.disabled = false;
+      input.focus();
+
+      return;
+    }
+
+    pedido.cliente.endereco = endereco;
 
     adicionarMensagem(
-      `Perfeito! Vou entregar seu pedido em: ${pedido.cliente.endereco} 📍`,
+      `Perfeito! Endereço registrado: ${pedido.cliente.endereco} 📍`,
+      "ia"
+    );
+
+    adicionarMensagem(
+      "Deseja informar um complemento? Ex.: apartamento, bloco, casa 2. Se não tiver, digite \"não\".",
+      "ia"
+    );
+
+    etapa = "informar-complemento";
+
+    input.value = "";
+    input.disabled = false;
+    input.focus();
+
+    return;
+  }
+
+  // ----------------------------------------------
+  // QUINTA ETAPA DA FINALIZAÇÃO: COMPLEMENTO
+  // ----------------------------------------------
+
+  if (etapa === "informar-complemento") {
+
+    const resposta = normalizarTexto(mensagem);
+
+    const semComplemento =
+      resposta === "nao" ||
+      resposta === "nao tenho" ||
+      resposta === "nenhum" ||
+      resposta === "sem complemento";
+
+    if (semComplemento) {
+
+      pedido.cliente.complemento = "";
+
+    } else {
+
+      pedido.cliente.complemento = mensagem.trim();
+
+    }
+
+    adicionarMensagem(
+      pedido.cliente.complemento
+        ? `Complemento registrado: ${pedido.cliente.complemento} 👍`
+        : "Tudo certo! Sem complemento. 👍",
       "ia"
     );
 
@@ -401,6 +722,7 @@ form.addEventListener("submit", async (event) => {
 
     return;
   }
+
 
   // ----------------------------------------------
   // ENTREGA OU RETIRADA
@@ -427,10 +749,11 @@ form.addEventListener("submit", async (event) => {
     if (escolheuEntrega) {
 
       pedido.entrega.tipo = "Entrega";
-      pedido.entrega.taxa = 5;
+
+      renderizarCarrinho();
 
       adicionarMensagem(
-        "🚚 Entrega selecionada! A taxa de entrega é R$ 5,00.",
+        `🚚 Entrega selecionada! A taxa de entrega é R$ ${formatarDinheiro(pedido.entrega.taxa)}.`,
         "ia"
       );
 
@@ -448,7 +771,6 @@ form.addEventListener("submit", async (event) => {
       return;
     }
 
-
     // ==========================================
     // RETIRADA
     // ==========================================
@@ -457,6 +779,8 @@ form.addEventListener("submit", async (event) => {
 
       pedido.entrega.tipo = "Retirada";
       pedido.entrega.taxa = 0;
+
+      renderizarCarrinho();
 
       adicionarMensagem(
         "🏪 Retirada selecionada! Não há taxa de entrega.",
@@ -477,7 +801,6 @@ form.addEventListener("submit", async (event) => {
       return;
     }
 
-
     // ==========================================
     // RESPOSTA NÃO IDENTIFICADA
     // ==========================================
@@ -497,14 +820,241 @@ form.addEventListener("submit", async (event) => {
 
   if (etapa === "informar-pagamento") {
 
-    pedido.pagamento = mensagem;
+    const pagamento = identificarPagamento(mensagem);
+
+
+    // ==============================================
+    // PAGAMENTO NÃO IDENTIFICADO
+    // ==============================================
+
+    if (!pagamento) {
+
+      adicionarMensagem(
+        "Não consegui identificar a forma de pagamento. 💳",
+        "ia"
+      );
+
+      adicionarMensagem(
+        "Escolha entre Pix, dinheiro ou cartão.",
+        "ia"
+      );
+
+      input.value = "";
+      input.disabled = false;
+      input.focus();
+
+      return;
+    }
+
+
+    // ==============================================
+    // PAGAMENTO IDENTIFICADO
+    // ==============================================
+
+    pedido.pagamento = pagamento;
+
+    if (etapa === "informar-pagamento") {
+
+      const pagamento = identificarPagamento(mensagem);
+
+
+      // ==============================================
+      // PAGAMENTO NÃO IDENTIFICADO
+      // ==============================================
+
+      if (!pagamento) {
+
+        adicionarMensagem(
+          "Não consegui identificar a forma de pagamento. 💳",
+          "ia"
+        );
+
+        adicionarMensagem(
+          "Escolha entre Pix, dinheiro ou cartão.",
+          "ia"
+        );
+
+        input.value = "";
+        input.disabled = false;
+        input.focus();
+
+        return;
+      }
+
+
+      // ==============================================
+      // PAGAMENTO IDENTIFICADO
+      // ==============================================
+
+      pedido.pagamento = pagamento;
+
+
+      // ==============================================
+      // DINHEIRO
+      // ==============================================
+
+      if (pagamento === "Dinheiro") {
+
+        adicionarMensagem(
+          "💵 Você precisa de troco?",
+          "ia"
+        );
+
+        etapa = "informar-troco";
+
+        input.value = "";
+        input.disabled = false;
+        input.focus();
+
+        return;
+      }
+
+
+      // ==============================================
+      // PIX / CARTÃO
+      // ==============================================
+
+      pedido.trocoPara = null;
+
+      pedido.total = calcularTotalPedido();
+
+      adicionarMensagem(
+        `Perfeito! Pagamento escolhido: ${pedido.pagamento}. 💳`,
+        "ia"
+      );
+
+      etapa = "confirmar-pedido";
+
+      mostrarResumoPedido();
+
+      input.value = "";
+      input.disabled = false;
+      input.focus();
+
+      console.log("Pedido completo:", pedido);
+
+      return;
+    }
 
     pedido.total = calcularTotalPedido();
+
 
     adicionarMensagem(
       `Perfeito! Pagamento escolhido: ${pedido.pagamento}. 💳`,
       "ia"
     );
+
+
+    etapa = "confirmar-pedido";
+
+    mostrarResumoPedido();
+
+
+    input.value = "";
+    input.disabled = false;
+    input.focus();
+
+
+    console.log(
+      "Pagamento:",
+      pedido.pagamento
+    );
+
+    console.log(
+      "Pedido completo:",
+      pedido
+    );
+
+    return;
+  }
+
+  // ----------------------------------------------
+  // TROCO
+  // ----------------------------------------------
+
+  if (etapa === "informar-troco") {
+
+    const troco = identificarTroco(mensagem);
+
+
+    // ==============================================
+    // RESPOSTA NÃO IDENTIFICADA
+    // ==============================================
+
+    if (!troco) {
+
+      adicionarMensagem(
+        'Informe "não" se não precisar de troco ou diga o valor para o qual precisa de troco. 💵',
+        "ia"
+      );
+
+      input.value = "";
+      input.disabled = false;
+      input.focus();
+
+      return;
+    }
+
+
+    // ==============================================
+    // NÃO PRECISA DE TROCO
+    // ==============================================
+
+    if (!troco.precisaTroco) {
+
+      pedido.trocoPara = null;
+
+      pedido.total = calcularTotalPedido();
+
+      adicionarMensagem(
+        "Perfeito! Sem troco. 💵",
+        "ia"
+      );
+
+      etapa = "confirmar-pedido";
+
+      mostrarResumoPedido();
+
+      input.value = "";
+      input.disabled = false;
+      input.focus();
+
+      return;
+    }
+
+
+    // ==============================================
+    // PRECISA DE TROCO
+    // ==============================================
+
+    if (troco.valor < pedido.total) {
+
+      adicionarMensagem(
+        `O valor informado é menor que o total do pedido (R$ ${formatarDinheiro(pedido.total)}). Informe um valor maior ou igual ao total. 💵`,
+        "ia"
+      );
+
+      input.value = "";
+      input.disabled = false;
+      input.focus();
+
+      return;
+    }
+
+
+    pedido.trocoPara = troco.valor;
+
+    pedido.total = calcularTotalPedido();
+
+    const valorTroco =
+      pedido.trocoPara - pedido.total;
+
+
+    adicionarMensagem(
+      `Perfeito! Troco para R$ ${formatarDinheiro(pedido.trocoPara)}. Seu troco será de R$ ${formatarDinheiro(valorTroco)}. 💵`,
+      "ia"
+    );
+
 
     etapa = "confirmar-pedido";
 
@@ -514,10 +1064,19 @@ form.addEventListener("submit", async (event) => {
     input.disabled = false;
     input.focus();
 
-    console.log("Pedido completo:", pedido);
+    console.log(
+      "Troco para:",
+      pedido.trocoPara
+    );
+
+    console.log(
+      "Valor do troco:",
+      valorTroco
+    );
 
     return;
   }
+
 
   function gerarNumeroPedido() {
 
@@ -895,8 +1454,48 @@ function renderizarCarrinho() {
   });
 
   contadorCarrinho.textContent = quantidadeTotal;
-  totalCarrinho.textContent =
-    `R$ ${pedido.total.toFixed(2).replace(".", ",")}`;
+
+  const totalProdutos = pedido.itens.reduce(
+    (total, item) => total + item.subtotal,
+    0
+  );
+
+  totalCarrinho.innerHTML = `
+  <div class="carrinho-valores">
+
+    <div class="carrinho-valor">
+      <span>Produtos</span>
+      <strong>
+        R$ ${totalProdutos.toFixed(2).replace(".", ",")}
+      </strong>
+    </div>
+
+    <div class="carrinho-valor">
+      <span>
+        ${pedido.entrega.tipo === "Entrega"
+      ? "🚚 Taxa de entrega"
+      : "🏪 Retirada"}
+      </span>
+
+      <strong>
+        ${pedido.entrega.taxa === 0
+      ? "Grátis"
+      : `R$ ${pedido.entrega.taxa
+        .toFixed(2)
+        .replace(".", ",")}`}
+      </strong>
+    </div>
+
+    <div class="carrinho-total">
+      <span>Total</span>
+
+      <strong>
+        R$ ${pedido.total.toFixed(2).replace(".", ",")}
+      </strong>
+    </div>
+
+  </div>
+`;
 
 
 
@@ -968,8 +1567,8 @@ function mostrarResumoPedido() {
 
             <strong>
                 R$ ${(pedido.total - pedido.entrega.taxa)
-          .toFixed(2)
-          .replace(".", ",")}
+      .toFixed(2)
+      .replace(".", ",")}
             </strong>
          </div>
 
@@ -1005,7 +1604,7 @@ function mostrarResumoPedido() {
 
 </div>
 
-        <div class="resumo-dados">
+          <div class="resumo-dados">
 
             <div>
                 <span>👤 Nome</span>
@@ -1013,8 +1612,33 @@ function mostrarResumoPedido() {
             </div>
 
             <div>
-                <span>📍 Endereço</span>
+                <span>📍 CEP</span>
+                <strong>${formatarCEP(pedido.cliente.cep)}</strong>
+            </div>
+
+            <div>
+                <span>🏘️ Bairro</span>
+                <strong>${pedido.cliente.bairro}</strong>
+            </div>
+
+            <div>
+                <span>🏠 Endereço</span>
                 <strong>${pedido.cliente.endereco}</strong>
+            </div>
+
+                  ${pedido.cliente.complemento
+      ? `
+            <div>
+              <span>🏢 Complemento</span>
+             <strong>${pedido.cliente.complemento}</strong>
+            </div>
+             `
+      : ""
+    }
+
+            <div>
+                <span>🚚 Tipo</span>
+                <strong>${pedido.entrega.tipo}</strong>
             </div>
 
             <div>
@@ -1022,7 +1646,21 @@ function mostrarResumoPedido() {
                 <strong>${pedido.pagamento}</strong>
             </div>
 
-        </div>
+            ${pedido.pagamento === "Dinheiro"
+      ? `
+                  <div>
+                    <span>💵 Troco para</span>
+                    <strong>
+                      ${pedido.trocoPara
+        ? `R$ ${formatarDinheiro(pedido.trocoPara)}`
+        : "Não precisa"}
+                    </strong>
+                  </div>
+                `
+      : ""
+    }
+
+</div>
 
         <div class="resumo-confirmacao">
             <span>Está tudo correto?</span>
@@ -1044,15 +1682,9 @@ function removerItem(index) {
 
   pedido.itens.splice(index, 1);
 
-
-  pedido.total = pedido.itens.reduce(
-    (total, item) => total + item.subtotal,
-    0
-  );
-
+  pedido.total = calcularTotalPedido();
 
   renderizarCarrinho();
-
 }
 
 // ==================================================
@@ -1120,7 +1752,6 @@ function alterarQuantidade(index, variacao) {
     return;
   }
 
-
   item.quantidade += variacao;
 
 
@@ -1135,8 +1766,7 @@ function alterarQuantidade(index, variacao) {
   } else {
 
     item.subtotal =
-      item.preco *
-      item.quantidade;
+      item.preco * item.quantidade;
 
   }
 
@@ -1145,15 +1775,50 @@ function alterarQuantidade(index, variacao) {
   // RECALCULA TOTAL
   // ==============================================
 
-  pedido.total = pedido.itens.reduce(
-    (total, item) => total + item.subtotal,
-    0
-  );
-
+  pedido.total = calcularTotalPedido();
 
   renderizarCarrinho();
 
 }
+
+
+// ==================================================
+// Busca por cep/bairro
+// ==================================================
+
+function normalizarTexto(texto) {
+  return texto
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase();
+}
+
+
+function buscarTaxaPorBairro(bairro) {
+
+  const bairroNormalizado = normalizarTexto(bairro);
+
+  const registro = tabelaTaxas.find(item =>
+    normalizarTexto(item.bairro) === bairroNormalizado
+  );
+
+  return registro || null;
+}
+
+console.log("IA.JS carregado!");
+const resultado = buscarTaxaPorBairro("Vila São José");
+
+if (resultado) {
+  console.log("Bairro:", resultado.bairro);
+  console.log("Taxa:", resultado.taxa);
+} else {
+  console.log("Bairro não cadastrado");
+}
+
+
+
+
 
 // ==================================================
 // INICIALIZAÇÃO

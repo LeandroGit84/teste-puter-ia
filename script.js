@@ -63,3 +63,4 @@ async function conversarComIA(mensagem) {
 
     return resposta.message.content;
 }
+
